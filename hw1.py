@@ -1,3 +1,5 @@
+print("✅ hw1.py 文件已经加载！")
+
 #!/usr/bin/env python3
 """FTEC5660 HW1 student starter: build a chain for supermarket receipts."""
 
