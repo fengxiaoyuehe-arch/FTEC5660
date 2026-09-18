@@ -96,6 +96,9 @@ def answer_queries(chain: Any, images: list[Path]) -> dict[str, Any]:
     to process independent receipt-extraction prompts in parallel.
     """
     ### YOUR CODE HERE
+    print("===== ENTERED answer_queries function =====") # 新增这一行！
+    import json
+    
     QUERY_1 = "What is the total cost on this receipt?"
     QUERY_2 = "What is the store name on this receipt?"
 
