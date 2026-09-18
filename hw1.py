@@ -63,7 +63,24 @@ def build_chain() -> Any:
     ``deepseek-v4-flash-vision-exp``. The API key is loaded from .env.
     """
     ### YOUR CODE HERE
-    return None
+    from langchain_core.prompts import ChatPromptTemplate
+    from langchain_deepseek import ChatDeepSeek
+
+    model = ChatDeepSeek(
+        model="deepseek-v4-flash-vision-exp",
+        temperature=0
+    )
+
+    prompt = ChatPromptTemplate.from_messages([
+        ("system", "You are a receipt reader. Answer the user query strictly based on the receipt image. Only output the answer value, no extra explanation."),
+        ("user", [
+            {"type": "image_url", "image_url": {"url": "{img_url}"}},
+            {"type": "text", "text": "{query}"}
+        ])
+    ])
+
+    chain = prompt | model
+    return chain
 
 
 def answer_queries(chain: Any, images: list[Path]) -> dict[str, Any]:
@@ -79,8 +96,33 @@ def answer_queries(chain: Any, images: list[Path]) -> dict[str, Any]:
     to process independent receipt-extraction prompts in parallel.
     """
     ### YOUR CODE HERE
-    _ = (chain, images)
-    return {QUERY_1: DUMMY_RESPONSE, QUERY_2: DUMMY_RESPONSE}
+    QUERY_1 = "What is the total cost on this receipt?"
+    QUERY_2 = "What is the store name on this receipt?"
+
+    batch_inputs = []
+    for img_path in images:
+        img_url = image_data_url(img_path) # 内置helper，不用手动base64
+        batch_inputs.append({
+            "img_url": img_url,
+            "query": QUERY_1
+        })
+        batch_inputs.append({
+            "img_url": img_url,
+            "query": QUERY_2
+        })
+
+    # 批量调用
+    outputs = chain.batch(batch_inputs)
+
+    result_dict = {}
+    idx = 0
+    for img_path in images:
+        result_dict[QUERY_1] = outputs[idx].content
+        idx +=1
+        result_dict[QUERY_2] = outputs[idx].content
+        idx +=1
+
+    return result_dict
 
 
 # Everything below is provided runner/scoring code. No edits are needed.
