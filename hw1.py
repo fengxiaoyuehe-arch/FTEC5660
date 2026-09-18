@@ -99,32 +99,32 @@ def answer_queries(chain: Any, images: list[Path]) -> dict[str, Any]:
     print("===== ENTERED answer_queries function =====") # 新增这一行！
     import json
     
-    QUERY_1 = "What is the total cost on this receipt?"
-    QUERY_2 = "What is the store name on this receipt?"
+    QUERY_1 = "How much money did I spend in total for these bills?"
+    QUERY_2 = "How much would I have had to pay without the discount?"
 
+    # 构造批量输入：只传入图片url，每张收据一条输入，不需要query
     batch_inputs = []
     for img_path in images:
-        img_url = image_data_url(img_path) # 内置helper，不用手动base64
-        batch_inputs.append({
-            "img_url": img_url,
-            "query": QUERY_1
-        })
-        batch_inputs.append({
-            "img_url": img_url,
-            "query": QUERY_2
-        })
+        img_url = image_data_url(img_path)
+        batch_inputs.append({"img_url": img_url})
 
-    # 批量调用
+    # 批量调用模型：每张收据单独提取金额JSON
     outputs = chain.batch(batch_inputs)
 
-    result_dict = {}
-    idx = 0
-    for img_path in images:
-        result_dict[QUERY_1] = outputs[idx].content
-        idx +=1
-        result_dict[QUERY_2] = outputs[idx].content
-        idx +=1
+    sum_paid = 0.0       # 累计所有收据实付金额 amount_paid_after_rounding
+    sum_no_discount = 0.0# 累计所有收据无折扣原价 amount_without_discounts
 
+    # 遍历每张收据返回的JSON，累加金额
+    for out in outputs:
+        parsed = json.loads(out.content)
+        sum_paid += parsed["amount_paid_after_rounding"]
+        sum_no_discount += parsed["amount_without_discounts"]
+
+    # 返回两个总和，key是规定的两个长问句
+    result_dict = {
+        QUERY_1: f"HK${sum_paid:.2f}",
+        QUERY_2: f"HK${sum_no_discount:.2f}"
+    }
     return result_dict
 
 
