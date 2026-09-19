@@ -65,23 +65,55 @@ def build_chain() -> Any:
     ``deepseek-v4-flash-vision-exp``. The API key is loaded from .env.
     """
     ### YOUR CODE HERE
+    import base64
+    from langchain_openai import ChatOpenAI
     from langchain_core.prompts import ChatPromptTemplate
-    from langchain_deepseek import ChatDeepSeek
+    from langchain_core.output_parsers import JsonOutputParser
+    from langchain_core.runnables import RunnableLambda
+    import os
 
-    model = ChatDeepSeek(
+    llm = ChatOpenAI(
         model="deepseek-v4-flash-vision-exp",
-        temperature=0
+        api_key=os.environ["DEEPSEEK_API_KEY"],
+        base_url="https://api.deepseek.com",
+        temperature=0.0
     )
 
+    def encode_image(image_path):
+        with open(image_path, "rb") as f:
+            return base64.b64encode(f.read()).decode("utf-8")
+
+    # 把本地路径转成base64的图片消息
+    def prepare_msg(input_dict):
+        path = input_dict["image_url"]
+        b64_img = encode_image(path)
+        return {
+            "image_url": f"data:image/jpeg;base64,{b64_img}"
+        }
+
     prompt = ChatPromptTemplate.from_messages([
-        ("system", "You are a receipt reader. Answer the user query strictly based on the receipt image. Only output the answer value, no extra explanation."),
-        ("user", [
-            {"type": "image_url", "image_url": {"url": "{img_url}"}},
-            {"type": "text", "text": "{query}"}
-        ])
+        ("system", """
+You are a highly precise receipt analyst.
+For this receipt image, first extract these values carefully:
+1. Subtotal before rounding
+2. Every discount / coupon / promotion amount (take absolute value)
+3. Rounding adjustment amount
+4. Final amount paid after rounding
+
+Then compute:
+price_without_discount = subtotal_before_rounding + sum_of_all_discount_absolute_values
+IMPORTANT: DO NOT include rounding adjustment in price_without_discount.
+paid_after_rounding = final amount customer paid after rounding.
+
+Return ONLY a JSON object with exactly two keys: paid_after_rounding, price_without_discount.
+No explanations, no markdown, no extra text, just raw JSON.
+Example: {{"paid_after_rounding":102.30,"price_without_discount":107.70}}
+
+"""),
+        ("human", [{"type": "image_url", "image_url": {"url": "{image_url}"}}])
     ])
 
-    chain = prompt | model
+    chain = RunnableLambda(prepare_msg) | prompt | llm | JsonOutputParser()
     return chain
 
 
@@ -97,37 +129,23 @@ def answer_queries(chain: Any, images: list[Path]) -> dict[str, Any]:
     multimodal human messages. LangChain's ``batch`` method is one simple way
     to process independent receipt-extraction prompts in parallel.
     """
-    ### YOUR CODE HERE
-    print("===== ENTERED answer_queries function =====") # 新增这一行！
-    import json
     
-    QUERY_1 = "How much money did I spend in total for these bills?"
-    QUERY_2 = "How much would I have had to pay without the discount?"
+    total_paid = 0.0
+    total_no_discount = 0.0
 
-    # 构造批量输入：只传入图片url，每张收据一条输入，不需要query
-    batch_inputs = []
+    # 循环：一张小票调用一次chain
     for img_path in images:
-        img_url = image_data_url(img_path)
-        batch_inputs.append({"img_url": img_url})
+        one_receipt = chain.invoke({"image_url": img_path})
+        paid = float(one_receipt["paid_after_rounding"])
+        no_disc = float(one_receipt["price_without_discount"])
+        total_paid += paid
+        total_no_discount += no_disc
 
-    # 批量调用模型：每张收据单独提取金额JSON
-    outputs = chain.batch(batch_inputs)
-
-    sum_paid = 0.0       # 累计所有收据实付金额 amount_paid_after_rounding
-    sum_no_discount = 0.0# 累计所有收据无折扣原价 amount_without_discounts
-
-    # 遍历每张收据返回的JSON，累加金额
-    for out in outputs:
-        parsed = json.loads(out.content)
-        sum_paid += parsed["amount_paid_after_rounding"]
-        sum_no_discount += parsed["amount_without_discounts"]
-
-    # 返回两个总和，key是规定的两个长问句
-    result_dict = {
-        QUERY_1: f"HK${sum_paid:.2f}",
-        QUERY_2: f"HK${sum_no_discount:.2f}"
+    result = {
+        "How much money did I spend in total for these bills?": f"HK${total_paid:.2f}",
+        "How much would I have had to pay without the discount?": f"HK${total_no_discount:.2f}"
     }
-    return result_dict
+    return result
 
 
 # Everything below is provided runner/scoring code. No edits are needed.
