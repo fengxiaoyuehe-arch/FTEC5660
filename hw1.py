@@ -66,16 +66,19 @@ def build_chain() -> Any:
     """
     ### YOUR CODE HERE
     import base64
-    from langchain_openai import ChatOpenAI
+    import os
+    from dotenv import load_dotenv
+
+    load_dotenv()
+
     from langchain_core.prompts import ChatPromptTemplate
     from langchain_core.output_parsers import JsonOutputParser
     from langchain_core.runnables import RunnableLambda
-    import os
-
-    llm = ChatOpenAI(
+    from langchain_deepseek import ChatDeepSeek
+    
+    llm = ChatDeepSeek(
         model="deepseek-v4-flash-vision-exp",
         api_key=os.environ["DEEPSEEK_API_KEY"],
-        base_url="https://api.deepseek.com",
         temperature=0.0
     )
 
@@ -108,7 +111,6 @@ paid_after_rounding = final amount customer paid after rounding.
 Return ONLY a JSON object with exactly two keys: paid_after_rounding, price_without_discount.
 No explanations, no markdown, no extra text, just raw JSON.
 Example: {{"paid_after_rounding":102.30,"price_without_discount":107.70}}
-
 """),
         ("human", [{"type": "image_url", "image_url": {"url": "{image_url}"}}])
     ])
