@@ -50,4 +50,26 @@ homework runner.
 
 ## Homework 1 solution: 
 > to students: please fill your solution description here.
+## Task 1: Receipt OCR & Sum Calculation
+### Chain Workflow
+1. Input: folder of receipt image paths
+2. For each receipt image:
+   - Encode local image into base64
+   - Pass image and system prompt to deepseek-v4-flash-vision-exp model
+   - Model extracts `paid_after_rounding` and `price_without_discount` for single receipt, output JSON
+3. Use Python to sum up values across all receipts, instead of asking LLM to compute total
+4. Format the total into HK$ string to answer the two queries
+5. Export answers into results.csv
+
+### Why this design
+Instead of feeding all 7 receipts into the model at once, we process receipts one by one.
+Vision model only needs to extract numbers from one receipt, which reduces the chance of missing discount lines.
+Arithmetic summation is handled in Python code, guaranteeing accurate total.
+
+## Task 2: Reflection
+The rapid development of multimodal AI reshapes my understanding of FinTech.
+Vision AI can extract structured data from unstructured documents like invoices and receipts, which automates traditional manual accounting work.
+For finance practitioners, AI is not just a replacement but a tool to improve efficiency.
+However, we still need to be cautious about hallucination. That is why I offload mathematical calculation to deterministic Python code rather than relying fully on LLM.
+In the future, I plan to combine multimodal models with financial rule checks to build more robust financial automation systems.
 
